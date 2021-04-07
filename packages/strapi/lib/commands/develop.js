@@ -10,6 +10,10 @@ const { logger } = require('strapi-utils');
 const loadConfiguration = require('../core/app-configuration');
 const strapi = require('../index');
 
+const fetch = require('node-fetch');
+
+
+
 /**
  * `$ strapi develop`
  *
@@ -114,6 +118,31 @@ function watchFileChanges({ dir, strapiInstance, watchIgnoreFiles, polling }) {
       strapiInstance.reload();
     }
   };
+  
+
+  const customWebhook = async() => {
+    return await fetch(process.env.CUSTOM_WEBHOOK_URL, {
+      method: 'POST',
+      body: JSON.stringify({
+        commit: {
+          author: process.env.CUSTOM_WEBHOOK_GIT_AUTHOR,
+          email: process.env.CUSTOM_WEBHOOK_GIT_EMAIL,
+          message: process.env.CUSTOM_WEBHOOK_GIT_MESSAGE,
+        },
+        local:{
+          remote: process.env.CUSTOM_WEBHOOK_REPO_REMOTE,
+          ref: process.env.CUSTOM_WEBHOOK_REPO_REF,
+        },
+        auth: {
+          username: process.env.CUSTOM_WEBHOOK_AUTH_USERNAME,
+          password: process.env.CUSTOM_WEBHOOK_AUTH_PASSWORD
+        }
+      }),
+      headers: { 'Content-Type': 'application/json' },
+    }).catch(() => {});
+    
+  }
+  
 
   const watcher = chokidar.watch(dir, {
     ignoreInitial: true,
@@ -140,16 +169,31 @@ function watchFileChanges({ dir, strapiInstance, watchIgnoreFiles, polling }) {
   });
 
   watcher
-    .on('add', path => {
+    .on('add', async (path) => {
       strapiInstance.log.info(`File created: ${path}`);
+      strapiInstance.log.info(`Custom webhook ready: ${process.env.CUSTOM_WEBHOOK_URL}`);
+      if ( process.env.CUSTOM_WEBHOOK_URL )  {
+        customWebhook();
+      }
+      strapiInstance.log.info(`Custom webhook complete: ${process.env.CUSTOM_WEBHOOK_URL}`);
       restart();
     })
-    .on('change', path => {
+    .on('change', async (path) => {
       strapiInstance.log.info(`File changed: ${path}`);
+      strapiInstance.log.info(`Custom webhook ready: ${process.env.CUSTOM_WEBHOOK_URL}`);
+      if ( process.env.CUSTOM_WEBHOOK_URL )  {
+        customWebhook();
+      }
+      strapiInstance.log.info(`Custom webhook complete: ${process.env.CUSTOM_WEBHOOK_URL}`);
       restart();
     })
-    .on('unlink', path => {
+    .on('unlink', async (path) => {
       strapiInstance.log.info(`File deleted: ${path}`);
+      strapiInstance.log.info(`Custom webhook ready: ${process.env.CUSTOM_WEBHOOK_URL}`);
+      if ( process.env.CUSTOM_WEBHOOK_URL )  {
+        customWebhook();
+      }
+      strapiInstance.log.info(`Custom webhook complete: ${process.env.CUSTOM_WEBHOOK_URL}`);
       restart();
     });
 }
